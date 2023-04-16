@@ -726,17 +726,9 @@ function sendShowStoreOffers(playerId, category, redirectId)
 		table.insert(offers[name].offers, offer)
 	end
 
-	-- If player doesn't have hireling
-	if category.name == "Hirelings" then
-		if player:getHirelingsCount() < 1 then
-			offers["Hireling Name Change"] = nil
-			offers["Hireling Sex Change"] = nil
-			offers["Hireling Trader"] = nil
-			offers["Hireling Steward"] = nil
-			offers["Hireling Banker"] = nil
-			offers["Hireling Cook"] = nil
-			count = count - 6
-		end
+	msg:addU16(#disableReasons)
+	for _, reason in ipairs(disableReasons) do
+		msg:addString(reason)
 	end
 
 	msg:addU16(#disableReasons)
@@ -766,7 +758,7 @@ function sendShowStoreOffers(playerId, category, redirectId)
 				if (off.disabledReadonIndex ~= nil) then
 					msg:addByte(0x01);
 					msg:addU16(off.disabledReadonIndex)
-					off.disabledReadonIndex = nil
+					off.disabledReadonIndex = nil -- Reseting the table to nil disable reason
 				end
 
 				if (off.state) then
@@ -1096,6 +1088,7 @@ GameStore.retrieveHistoryEntries = function(accountId, currentPage, entriesPerPa
 				mode = result.getNumber(resultId, "mode"),
 				description = result.getString(resultId, "description"),
 				amount = result.getNumber(resultId, "coin_amount"),
+				type = result.getNumber(resultId, "coin_type"),
 				time = result.getNumber(resultId, "time"),
 			}
 			table.insert(entries, entry)
@@ -1728,7 +1721,7 @@ function sendHomePage(playerId)
 		if (offer.disabledReadonIndex ~= nil) then
 			msg:addByte(0x01);
 			msg:addU16(offer.disabledReadonIndex)
-			offer.disabledReadonIndex = nil
+			offer.disabledReadonIndex = nil -- Reseting the table to nil disable reason
 		end
 
 		msg:addByte(0x00)

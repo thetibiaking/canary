@@ -204,6 +204,16 @@ std::string Player::getDescription(int32_t lookDistance) const {
 	return s.str();
 }
 
+int64_t Player::getMaxHealth() const {
+	auto safeConverted = toSafeNumber<int64_t>(__FUNCTION__, std::max<int64_t>(0, healthMax + varStats[STAT_MAXHITPOINTS]));
+	return safeConverted;
+}
+
+uint32_t Player::getMaxMana() const {
+	auto safeConverted = toSafeNumber<uint32_t>(__FUNCTION__, std::max<int64_t>(0, manaMax + varStats[STAT_MAXMANAPOINTS]));
+	return safeConverted;
+}
+
 Item* Player::getInventoryItem(Slots_t slot) const {
 	if (slot < CONST_SLOT_FIRST || slot > CONST_SLOT_LAST) {
 		return nullptr;
@@ -554,8 +564,7 @@ void Player::updateInventoryImbuement() {
 			ImbuementInfo imbuementInfo;
 			// Get the imbuement information for the current slot
 			if (!item->getImbuementInfo(slotid, &imbuementInfo)) {
-				// If no imbuement is found, continue to the next slot
-				break;
+				continue;
 			}
 
 			// Imbuement from imbuementInfo, this variable reduces code complexity
@@ -565,10 +574,8 @@ void Player::updateInventoryImbuement() {
 			// Parent of the imbued item
 			auto parent = item->getParent();
 			// If the imbuement is aggressive and the player is not in fight mode or is in a protection zone, or the item is in a container, ignore it.
-			if (categoryImbuement && categoryImbuement->agressive) {
-				if (!isInFightMode || isInProtectionZone || parent && parent->getContainer()) {
-					continue;
-				}
+			if (categoryImbuement && categoryImbuement->agressive && (isInProtectionZone || !isInFightMode)) {
+				continue;
 			}
 			// If the item is not in the backpack slot and it's not a agressive imbuement, ignore it.
 			if (categoryImbuement && !categoryImbuement->agressive && parent && parent != this) {
@@ -578,6 +585,7 @@ void Player::updateInventoryImbuement() {
 			// If the imbuement's duration is 0, remove its stats and continue to the next slot
 			if (imbuementInfo.duration == 0) {
 				removeItemImbuementStats(imbuement);
+				updateImbuementTrackerStats();
 				continue;
 			}
 
@@ -655,7 +663,7 @@ void Player::addSkillAdvance(skills_t skill, uint64_t count) {
 	}
 }
 
-void Player::setVarStats(stats_t stat, int32_t modifier) {
+void Player::setVarStats(stats_t stat, int64_t modifier) {
 	varStats[stat] += modifier;
 
 	switch (stat) {
@@ -683,7 +691,7 @@ void Player::setVarStats(stats_t stat, int32_t modifier) {
 	}
 }
 
-int32_t Player::getDefaultStats(stats_t stat) const {
+int64_t Player::getDefaultStats(stats_t stat) const {
 	switch (stat) {
 		case STAT_MAXHITPOINTS:
 			return healthMax;
@@ -1182,9 +1190,15 @@ void Player::updateSupplyTracker(const Item* item) const {
 	}
 }
 
-void Player::updateImpactTracker(CombatType_t type, int32_t amount) const {
+void Player::updateImpactTracker(int64_t type, int64_t amount) const {
 	if (client) {
-		client->sendUpdateImpactTracker(type, amount);
+		client->sendUpdateImpactTracker(static_cast<CombatType_t>(type), toSafeNumber<uint32_t>(__FUNCTION__, amount));
+	}
+}
+
+void Player::updateInputAnalyzer(int64_t type, int64_t amount, const std::string &target) const {
+	if (client) {
+		client->sendUpdateInputAnalyzer(static_cast<CombatType_t>(type), toSafeNumber<uint32_t>(__FUNCTION__, amount), target);
 	}
 }
 
@@ -1619,6 +1633,7 @@ void Player::onChangeZone(ZoneType_t zone) {
 
 	onThinkWheelOfDestiny(true);
 	sendWheelOfDestinyGiftOfLifeCooldown();
+	updateImbuementTrackerStats();
 	g_game().updateCreatureWalkthrough(this);
 	g_game().playerRequestInventoryImbuements(getID());
 	sendIcons();
@@ -2013,13 +2028,13 @@ uint32_t Player::isMuted() const {
 		return 0;
 	}
 
-	int32_t muteTicks = 0;
+	int64_t muteTicks = 0;
 	for (Condition* condition : conditions) {
 		if (condition->getType() == CONDITION_MUTED && condition->getTicks() > muteTicks) {
 			muteTicks = condition->getTicks();
 		}
 	}
-	return static_cast<uint32_t>(muteTicks) / 1000;
+	return toSafeNumber<uint32_t>(__FUNCTION__, muteTicks) / 1000;
 }
 
 void Player::addMessageBuffer() {
@@ -2054,12 +2069,12 @@ void Player::removeMessageBuffer() {
 	}
 }
 
-void Player::drainHealth(Creature* attacker, int32_t damage) {
+void Player::drainHealth(Creature* attacker, int64_t damage) {
 	Creature::drainHealth(attacker, damage);
 	sendStats();
 }
 
-void Player::drainMana(Creature* attacker, int32_t manaLoss) {
+void Player::drainMana(Creature* attacker, int64_t manaLoss) {
 	Creature::drainMana(attacker, manaLoss);
 	sendStats();
 }
@@ -2149,7 +2164,7 @@ void Player::addExperience(Creature* target, uint64_t exp, bool sendText /* = fa
 
 		TextMessage message(MESSAGE_EXPERIENCE, "You gained " + expString + (hazard ? " (Hazard)" : ""));
 		message.position = position;
-		message.primary.value = exp;
+		message.primary.value = static_cast<int64_t>(exp);
 		message.primary.color = TEXTCOLOR_WHITE_EXP;
 		sendTextMessage(message);
 
@@ -2242,7 +2257,7 @@ void Player::removeExperience(uint64_t exp, bool sendText /* = false*/) {
 
 		TextMessage message(MESSAGE_EXPERIENCE, expString);
 		message.position = position;
-		message.primary.value = lostExp;
+		message.primary.value = static_cast<int64_t>(lostExp);
 		message.primary.color = TEXTCOLOR_RED;
 		sendTextMessage(message);
 
@@ -2266,13 +2281,13 @@ void Player::removeExperience(uint64_t exp, bool sendText /* = false*/) {
 		// Player stats loss for vocations level <= 8
 		if (vocation->getId() != VOCATION_NONE && level <= 8) {
 			const Vocation* noneVocation = g_vocations().getVocation(VOCATION_NONE);
-			healthMax = std::max<int32_t>(0, healthMax - noneVocation->getHPGain());
-			manaMax = std::max<int32_t>(0, manaMax - noneVocation->getManaGain());
-			capacity = std::max<int32_t>(0, capacity - noneVocation->getCapGain());
+			healthMax = toSafeNumber<uint32_t>(__FUNCTION__, std::max<int64_t>(0, healthMax - noneVocation->getHPGain()));
+			manaMax = toSafeNumber<uint32_t>(__FUNCTION__, std::max<int64_t>(0, manaMax - noneVocation->getManaGain()));
+			capacity = toSafeNumber<uint32_t>(__FUNCTION__, std::max<int64_t>(0, capacity - noneVocation->getCapGain()));
 		} else {
-			healthMax = std::max<int32_t>(0, healthMax - vocation->getHPGain());
-			manaMax = std::max<int32_t>(0, manaMax - vocation->getManaGain());
-			capacity = std::max<int32_t>(0, capacity - vocation->getCapGain());
+			healthMax = toSafeNumber<uint32_t>(__FUNCTION__, std::max<int64_t>(0, healthMax - vocation->getHPGain()));
+			manaMax = toSafeNumber<uint32_t>(__FUNCTION__, std::max<int64_t>(0, manaMax - vocation->getManaGain()));
+			capacity = toSafeNumber<uint32_t>(__FUNCTION__, std::max<int64_t>(0, capacity - vocation->getCapGain()));
 		}
 		currLevelExp = Player::getExpForLevel(level);
 	}
@@ -2372,7 +2387,7 @@ bool Player::hasShield() const {
 	return false;
 }
 
-BlockType_t Player::blockHit(Creature* attacker, CombatType_t combatType, int32_t &damage, bool checkDefense /* = false*/, bool checkArmor /* = false*/, bool field /* = false*/) {
+BlockType_t Player::blockHit(Creature* attacker, CombatType_t combatType, int64_t &damage, bool checkDefense /* = false*/, bool checkArmor /* = false*/, bool field /* = false*/) {
 	BlockType_t blockType = Creature::blockHit(attacker, combatType, damage, checkDefense, checkArmor, field);
 
 	bool isReflected = false;
@@ -2402,7 +2417,13 @@ BlockType_t Player::blockHit(Creature* attacker, CombatType_t combatType, int32_
 				const int16_t &absorbPercent = it.abilities->absorbPercent[combatTypeToIndex(combatType)];
 				auto charges = item->getAttribute<uint16_t>(ItemAttribute_t::CHARGES);
 				if (absorbPercent != 0) {
-					damage -= std::round(damage * (absorbPercent / 100.));
+					// Safe conversion
+					auto doubleDamage = static_cast<double>(damage);
+					auto absorbDouble = static_cast<double>(absorbPercent);
+					auto safeConverted = toSafeNumber<int64_t>(__FUNCTION__, std::round(doubleDamage * (absorbDouble / 100.)));
+					damage -= safeConverted;
+
+					uint16_t charges = item->getCharges();
 					if (charges != 0) {
 						g_game().transformItem(item, item->getID(), charges - 1);
 					}
@@ -2411,7 +2432,8 @@ BlockType_t Player::blockHit(Creature* attacker, CombatType_t combatType, int32_
 				if (field) {
 					const int16_t &fieldAbsorbPercent = it.abilities->fieldAbsorbPercent[combatTypeToIndex(combatType)];
 					if (fieldAbsorbPercent != 0) {
-						damage -= std::round(damage * (fieldAbsorbPercent / 100.));
+						auto safeConverted = toSafeNumber<int64_t>(__FUNCTION__, std::round(damage * fieldAbsorbPercent));
+						damage -= safeConverted / 100;
 						if (charges != 0) {
 							g_game().transformItem(item, item->getID(), charges - 1);
 						}
@@ -2427,7 +2449,8 @@ BlockType_t Player::blockHit(Creature* attacker, CombatType_t combatType, int32_
 						CombatDamage reflectDamage;
 						reflectDamage.origin = ORIGIN_SPELL;
 						reflectDamage.primary.type = combatType;
-						reflectDamage.primary.value = std::round(-damage * (reflectPercent / 100.));
+						auto safeConverted = toSafeNumber<int64_t>(__FUNCTION__, std::round(-damage * (reflectPercent / 100)));
+						reflectDamage.primary.value = safeConverted;
 
 						Combat::doCombatHealth(this, attacker, reflectDamage, params);
 					}
@@ -2460,7 +2483,8 @@ BlockType_t Player::blockHit(Creature* attacker, CombatType_t combatType, int32_
 				const int16_t &imbuementAbsorbPercent = imbuementInfo.imbuement->absorbPercent[combatTypeToIndex(combatType)];
 
 				if (imbuementAbsorbPercent != 0) {
-					damage -= std::ceil(damage * (imbuementAbsorbPercent / 100.));
+					auto safeConverted = toSafeNumber<int64_t>(__FUNCTION__, std::ceil(damage * (imbuementAbsorbPercent / 100)));
+					damage -= safeConverted;
 				}
 			}
 		}
@@ -2503,6 +2527,7 @@ uint32_t Player::getIP() const {
 void Player::death(Creature* lastHitCreature) {
 	loginPosition = town->getTemplePosition();
 
+	g_game().sendSingleSoundEffect(this->getPosition(), sex == PLAYERSEX_FEMALE ? SoundEffect_t::HUMAN_FEMALE_DEATH : SoundEffect_t::HUMAN_MALE_DEATH, this);
 	if (skillLoss) {
 		uint8_t unfairFightReduction = 100;
 		int playerDmg = 0;
@@ -2617,9 +2642,9 @@ void Player::death(Creature* lastHitCreature) {
 
 			while (level > 1 && experience < Player::getExpForLevel(level)) {
 				--level;
-				healthMax = std::max<int32_t>(0, healthMax - vocation->getHPGain());
-				manaMax = std::max<int32_t>(0, manaMax - vocation->getManaGain());
-				capacity = std::max<int32_t>(0, capacity - vocation->getCapGain());
+				healthMax = toSafeNumber<int64_t>(__FUNCTION__, healthMax - vocation->getHPGain());
+				manaMax = toSafeNumber<uint32_t>(__FUNCTION__, manaMax - vocation->getManaGain());
+				capacity = toSafeNumber<uint32_t>(__FUNCTION__, capacity - vocation->getCapGain());
 			}
 
 			if (oldLevel != level) {
@@ -4083,6 +4108,24 @@ void Player::getPathSearchParams(const Creature* creature, FindPathParams &fpp) 
 	fpp.fullPathSearch = true;
 }
 
+uint16_t Player::getSkillLevel(uint8_t skill, bool sendToClient /* = false*/) const {
+	auto skillLevel = std::max<int64_t>(0, skills[skill].level + varSkills[skill]);
+
+	if (auto it = maxValuePerSkill.find(skill);
+		it != maxValuePerSkill.end()) {
+		skillLevel = std::min<int64_t>(it->second, skillLevel);
+	}
+
+	auto safeConverted = toSafeNumber<uint16_t>(__FUNCTION__, skillLevel);
+
+	// Send to client multiplied skill mana/life leech (13.00+ version changed to decimal)
+	if (sendToClient && (skill == SKILL_MANA_LEECH_AMOUNT || skill == SKILL_LIFE_LEECH_AMOUNT)) {
+		return safeConverted * 100;
+	}
+
+	return safeConverted;
+}
+
 void Player::doAttacking(uint32_t) {
 	if (lastAttack == 0) {
 		lastAttack = OTSYS_TIME() - getAttackSpeed() - 1;
@@ -4375,7 +4418,7 @@ void Player::onPlacedCreature() {
 	sendUnjustifiedPoints();
 }
 
-void Player::onAttackedCreatureDrainHealth(Creature* target, int32_t points) {
+void Player::onAttackedCreatureDrainHealth(Creature* target, int64_t points) {
 	Creature::onAttackedCreatureDrainHealth(target, points);
 
 	if (target) {
@@ -4389,7 +4432,7 @@ void Player::onAttackedCreatureDrainHealth(Creature* target, int32_t points) {
 	}
 }
 
-void Player::onTargetCreatureGainHealth(Creature* target, int32_t points) {
+void Player::onTargetCreatureGainHealth(Creature* target, int64_t points) {
 	if (target && party) {
 		Player* tmpPlayer = nullptr;
 
@@ -4536,12 +4579,16 @@ bool Player::lastHitIsPlayer(Creature* lastHitCreature) {
 	return lastHitMaster && lastHitMaster->getPlayer();
 }
 
-void Player::changeHealth(int32_t healthChange, bool sendHealthChange /* = true*/) {
+void Player::changeHealth(int64_t healthChange, bool sendHealthChange /* = true*/) {
+	if (PLAYER_SOUND_HEALTH_CHANGE >= static_cast<uint32_t>(uniform_random(1, 100))) {
+		g_game().sendSingleSoundEffect(this->getPosition(), sex == PLAYERSEX_FEMALE ? SoundEffect_t::HUMAN_FEMALE_BARK : SoundEffect_t::HUMAN_MALE_BARK, this);
+	}
+
 	Creature::changeHealth(healthChange, sendHealthChange);
 	sendStats();
 }
 
-void Player::changeMana(int32_t manaChange) {
+void Player::changeMana(int64_t manaChange) {
 	if (!hasFlag(PlayerFlags_t::HasInfiniteMana)) {
 		Creature::changeMana(manaChange);
 	}
@@ -5707,7 +5754,7 @@ uint16_t Player::getFreeBackpackSlots() const {
 void Player::addItemImbuementStats(const Imbuement* imbuement) {
 	bool requestUpdate = false;
 	// Check imbuement skills
-	for (int32_t skill = SKILL_FIRST; skill <= SKILL_LAST; ++skill) {
+	for (int64_t skill = SKILL_FIRST; skill <= SKILL_LAST; ++skill) {
 		if (imbuement->skills[skill]) {
 			requestUpdate = true;
 			setVarSkill(static_cast<skills_t>(skill), imbuement->skills[skill]);
@@ -5715,7 +5762,7 @@ void Player::addItemImbuementStats(const Imbuement* imbuement) {
 	}
 
 	// Check imbuement magic level
-	for (int32_t stat = STAT_FIRST; stat <= STAT_LAST; ++stat) {
+	for (int64_t stat = STAT_FIRST; stat <= STAT_LAST; ++stat) {
 		if (imbuement->stats[stat]) {
 			requestUpdate = true;
 			setVarStats(static_cast<stats_t>(stat), imbuement->stats[stat]);
@@ -5742,7 +5789,7 @@ void Player::addItemImbuementStats(const Imbuement* imbuement) {
 void Player::removeItemImbuementStats(const Imbuement* imbuement) {
 	bool requestUpdate = false;
 
-	for (int32_t skill = SKILL_FIRST; skill <= SKILL_LAST; ++skill) {
+	for (int64_t skill = SKILL_FIRST; skill <= SKILL_LAST; ++skill) {
 		if (imbuement->skills[skill]) {
 			requestUpdate = true;
 			setVarSkill(static_cast<skills_t>(skill), -imbuement->skills[skill]);
@@ -5750,7 +5797,7 @@ void Player::removeItemImbuementStats(const Imbuement* imbuement) {
 	}
 
 	// Check imbuement magic level
-	for (int32_t stat = STAT_FIRST; stat <= STAT_LAST; ++stat) {
+	for (int64_t stat = STAT_FIRST; stat <= STAT_LAST; ++stat) {
 		if (imbuement->stats[stat]) {
 			requestUpdate = true;
 			setVarStats(static_cast<stats_t>(stat), -imbuement->stats[stat]);
@@ -5771,6 +5818,12 @@ void Player::removeItemImbuementStats(const Imbuement* imbuement) {
 	if (requestUpdate) {
 		sendStats();
 		sendSkills();
+	}
+}
+
+void Player::updateImbuementTrackerStats() {
+	if (imbuementTrackerWindowOpen) {
+		g_game().playerRequestInventoryImbuements(getID(), true);
 	}
 }
 
@@ -5990,7 +6043,7 @@ void Player::triggerMomentum() {
 	}
 
 	double_t chance = item->getMomentumChance();
-	double_t randomChance = uniform_random(0, 10000) / 100;
+	auto randomChance = static_cast<double_t>(uniform_random(0, 10000) / 100);
 	if (getZone() != ZONE_PROTECTION && hasCondition(CONDITION_INFIGHT) && ((OTSYS_TIME() / 1000) % 2) == 0 && chance > 0 && randomChance < chance) {
 		bool triggered = false;
 		auto it = conditions.begin();
@@ -5998,12 +6051,13 @@ void Player::triggerMomentum() {
 			auto condItem = *it;
 			ConditionType_t type = condItem->getType();
 			uint32_t spellId = condItem->getSubId();
-			int32_t ticks = condItem->getTicks();
-			int32_t newTicks = (ticks <= 2000) ? 0 : ticks - 2000;
+			int64_t ticks = condItem->getTicks();
+			int64_t newTicks = (ticks <= 2000) ? 0 : ticks - 2000;
 			triggered = true;
 			if (type == CONDITION_SPELLCOOLDOWN || (type == CONDITION_SPELLGROUPCOOLDOWN && spellId > SPELLGROUP_SUPPORT)) {
 				condItem->setTicks(newTicks);
-				type == CONDITION_SPELLGROUPCOOLDOWN ? sendSpellGroupCooldown(static_cast<SpellGroup_t>(spellId), newTicks) : sendSpellCooldown(static_cast<uint16_t>(spellId), newTicks);
+				auto safeConverted = toSafeNumber<uint32_t>(__FUNCTION__, newTicks);
+				type == CONDITION_SPELLGROUPCOOLDOWN ? sendSpellGroupCooldown(static_cast<SpellGroup_t>(spellId), safeConverted) : sendSpellCooldown(static_cast<uint16_t>(spellId), safeConverted);
 			}
 			++it;
 		}
@@ -6220,7 +6274,98 @@ Item* Player::getItemFromDepotSearch(uint16_t itemId, const Position &pos) {
 	return nullptr;
 }
 
-std::pair<std::vector<Item*>, std::map<uint16_t, std::map<uint8_t, uint32_t>>> Player::requestLockerItems(DepotLocker* depotLocker, bool sendToClient /*= false*/, uint8_t tier /*= 0*/) const {
+SoundEffect_t Player::getHitSoundEffect() const {
+	// Distance sound effects
+	const Item* tool = getWeapon();
+	if (tool == nullptr) {
+		return SoundEffect_t::SILENCE;
+	}
+
+	switch (const auto &it = Item::items[tool->getID()]; it.weaponType) {
+		case WEAPON_AMMO: {
+			if (it.ammoType == AMMO_BOLT) {
+				return SoundEffect_t::DIST_ATK_CROSSBOW_SHOT;
+			} else if (it.ammoType == AMMO_ARROW) {
+				if (it.shootType == CONST_ANI_BURSTARROW) {
+					return SoundEffect_t::BURST_ARROW_EFFECT;
+				} else if (it.shootType == CONST_ANI_DIAMONDARROW) {
+					return SoundEffect_t::DIAMOND_ARROW_EFFECT;
+				}
+			} else {
+				return SoundEffect_t::DIST_ATK_THROW_SHOT;
+			}
+		}
+		case WEAPON_DISTANCE: {
+			if (tool->getAmmoType() == AMMO_BOLT) {
+				return SoundEffect_t::DIST_ATK_CROSSBOW_SHOT;
+			} else if (tool->getAmmoType() == AMMO_ARROW) {
+				return SoundEffect_t::DIST_ATK_BOW_SHOT;
+			} else {
+				return SoundEffect_t::DIST_ATK_THROW_SHOT;
+			}
+		}
+		case WEAPON_WAND: {
+			// Separate between wand and rod here
+			// return SoundEffect_t::DIST_ATK_ROD_SHOT;
+			return SoundEffect_t::DIST_ATK_WAND_SHOT;
+		}
+		default: {
+			return SoundEffect_t::SILENCE;
+		}
+	} // switch
+
+	return SoundEffect_t::SILENCE;
+}
+
+SoundEffect_t Player::getAttackSoundEffect() const {
+	const Item* tool = getWeapon();
+	if (tool == nullptr) {
+		return SoundEffect_t::HUMAN_CLOSE_ATK_FIST;
+	}
+
+	const ItemType &it = Item::items[tool->getID()];
+	if (it.weaponType == WEAPON_NONE || it.weaponType == WEAPON_SHIELD) {
+		return SoundEffect_t::HUMAN_CLOSE_ATK_FIST;
+	}
+
+	switch (it.weaponType) {
+		case WEAPON_AXE: {
+			return SoundEffect_t::MELEE_ATK_AXE;
+		}
+		case WEAPON_SWORD: {
+			return SoundEffect_t::MELEE_ATK_SWORD;
+		}
+		case WEAPON_CLUB: {
+			return SoundEffect_t::MELEE_ATK_CLUB;
+		}
+		case WEAPON_AMMO:
+		case WEAPON_DISTANCE: {
+			if (tool->getAmmoType() == AMMO_BOLT) {
+				return SoundEffect_t::DIST_ATK_CROSSBOW;
+			} else if (tool->getAmmoType() == AMMO_ARROW) {
+				return SoundEffect_t::DIST_ATK_BOW;
+			} else {
+				return SoundEffect_t::DIST_ATK_THROW;
+			}
+
+			break;
+		}
+		case WEAPON_WAND: {
+			return SoundEffect_t::MAGICAL_RANGE_ATK;
+		}
+		default: {
+			return SoundEffect_t::SILENCE;
+		}
+	}
+
+	return SoundEffect_t::SILENCE;
+}
+
+std::pair<std::vector<Item*>, std::map<uint16_t, std::map<uint8_t, uint32_t>>> Player::requestLockerItems(
+	DepotLocker* depotLocker,
+	bool sendToClient /* = false*/,
+	uint8_t tier /* = 0*/
+) const {
 	if (depotLocker == nullptr) {
 		SPDLOG_ERROR("{} - Depot locker is nullptr", __FUNCTION__);
 		return {};

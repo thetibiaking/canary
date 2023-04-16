@@ -121,10 +121,10 @@ class Weapon : public Script {
 			manaPercent = m;
 		}
 
-		int32_t getHealth() const {
+		uint32_t getHealth() const {
 			return health;
 		}
-		void setHealth(int32_t h) {
+		void setHealth(uint32_t h) {
 			health = h;
 		}
 
@@ -187,7 +187,7 @@ class Weapon : public Script {
 		}
 
 		uint32_t getManaCost(const Player* player) const;
-		int32_t getHealthCost(const Player* player) const;
+		int64_t getHealthCost(const Player* player) const;
 		bool executeUseWeapon(Player* player, const LuaVariant &var) const;
 
 		uint16_t id = 0;

@@ -51,15 +51,18 @@ struct spellBlock_t {
 		int32_t maxCombatValue = 0;
 		bool combatSpell = false;
 		bool isMelee = false;
+
+		SoundEffect_t soundImpactEffect = SoundEffect_t::SILENCE;
+		SoundEffect_t soundCastEffect = SoundEffect_t::SILENCE;
 };
 
 class MonsterType {
 		struct MonsterInfo {
 				LuaScriptInterface* scriptInterface;
 
-				std::map<CombatType_t, int32_t> elementMap;
-				std::map<CombatType_t, int32_t> reflectMap;
-				std::map<CombatType_t, int32_t> healingMap;
+				std::map<CombatType_t, int64_t> elementMap;
+				std::map<CombatType_t, int64_t> reflectMap;
+				std::map<CombatType_t, int64_t> healingMap;
 
 				std::vector<voiceBlock_t> voiceVector;
 
@@ -114,6 +117,10 @@ class MonsterType {
 				std::string bosstiaryClass;
 
 				float mitigation = 0;
+				uint32_t soundChance = 0;
+				uint32_t soundSpeedTicks = 0;
+				std::vector<SoundEffect_t> soundVector;
+				SoundEffect_t deathSound = SoundEffect_t::SILENCE;
 
 				int32_t creatureAppearEvent = -1;
 				int32_t creatureDisappearEvent = -1;
@@ -122,8 +129,8 @@ class MonsterType {
 				int32_t thinkEvent = -1;
 				int32_t targetDistance = 1;
 				int32_t runAwayHealth = 0;
-				int32_t health = 100;
-				int32_t healthMax = 100;
+				int64_t health = 100;
+				int64_t healthMax = 100;
 				int32_t changeTargetChance = 0;
 				int32_t defense = 0;
 				int32_t armor = 0;
@@ -230,6 +237,9 @@ class MonsterSpell {
 		MagicEffectClasses effect = CONST_ME_NONE;
 		ConditionType_t conditionType = CONDITION_NONE;
 		CombatType_t combatType = COMBAT_UNDEFINEDDAMAGE;
+
+		SoundEffect_t soundImpactEffect = SoundEffect_t::SILENCE;
+		SoundEffect_t soundCastEffect = SoundEffect_t::SILENCE;
 };
 
 class Monsters {

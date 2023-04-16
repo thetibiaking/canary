@@ -297,7 +297,7 @@ int GlobalFunctions::luaDoAreaCombatHealth(lua_State* L) {
 		CombatDamage damage;
 		damage.origin = getNumber<CombatOrigin>(L, 8, ORIGIN_SPELL);
 		damage.primary.type = combatType;
-		damage.primary.value = normal_random(getNumber<int32_t>(L, 6), getNumber<int32_t>(L, 5));
+		damage.primary.value = normal_random(getNumber<int64_t>(L, 6), getNumber<int64_t>(L, 5));
 
 		damage.instantSpellName = getString(L, 9);
 		damage.runeSpellName = getString(L, 10);
@@ -339,7 +339,7 @@ int GlobalFunctions::luaDoTargetCombatHealth(lua_State* L) {
 	CombatDamage damage;
 	damage.origin = getNumber<CombatOrigin>(L, 7, ORIGIN_SPELL);
 	damage.primary.type = combatType;
-	damage.primary.value = normal_random(getNumber<int32_t>(L, 4), getNumber<int32_t>(L, 5));
+	damage.primary.value = normal_random(getNumber<int64_t>(L, 4), getNumber<int64_t>(L, 5));
 
 	damage.instantSpellName = getString(L, 8);
 	damage.runeSpellName = getString(L, 9);
@@ -375,7 +375,7 @@ int GlobalFunctions::luaDoAreaCombatMana(lua_State* L) {
 		CombatDamage damage;
 		damage.origin = getNumber<CombatOrigin>(L, 7, ORIGIN_SPELL);
 		damage.primary.type = COMBAT_MANADRAIN;
-		damage.primary.value = normal_random(getNumber<int32_t>(L, 4), getNumber<int32_t>(L, 5));
+		damage.primary.value = normal_random(getNumber<int64_t>(L, 4), getNumber<int64_t>(L, 5));
 
 		damage.instantSpellName = getString(L, 8);
 		damage.runeSpellName = getString(L, 9);
@@ -415,7 +415,7 @@ int GlobalFunctions::luaDoTargetCombatMana(lua_State* L) {
 	CombatDamage damage;
 	damage.origin = getNumber<CombatOrigin>(L, 6, ORIGIN_SPELL);
 	damage.primary.type = COMBAT_MANADRAIN;
-	damage.primary.value = normal_random(getNumber<int32_t>(L, 3), getNumber<int32_t>(L, 4));
+	damage.primary.value = normal_random(getNumber<int64_t>(L, 3), getNumber<int64_t>(L, 4));
 
 	damage.instantSpellName = getString(L, 7);
 	damage.runeSpellName = getString(L, 8);
