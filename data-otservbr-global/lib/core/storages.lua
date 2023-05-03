@@ -2816,6 +2816,13 @@ Storage = {
 				GoshnarMegalomaniaTimer = 47221,
 				GoshnarMegalomaniaKilled = 47222,
 				QuestReward = 47223,
+				Curses = {
+					ClaustrophobicInferno = 47223,
+					MirroredNightmare = 47224,
+					FuriousCrater = 47225,
+					EbbandFlow = 47226,
+					RottenWasteland = 47227,
+				},
 			},
 		},
 		U12_60 = { -- update 12.60 - Reserved Storages 47501 - 47600
