@@ -28,6 +28,6 @@ function Player.resetCurses(self)
 end
 
 function Player.hasKilledMegalomania(self)
-    resetCurses(self)
+    resetCurses()
 end
 
