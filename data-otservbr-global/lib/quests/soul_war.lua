@@ -1,6 +1,6 @@
-local function applyRandomCurse(player)
+function Player.applyRandomCurse(self)
     local curses = SoulWar.Curses
-    local storedCurse = player:getStorageValue(curses.ClaustrophobicInferno)
+    local storedCurse = self:getStorageValue(curses.ClaustrophobicInferno)
     if storedCurse == -1 then
         -- Player does not have a curse stored, select a random curse
         local curseKeys = table.keys(curses)
@@ -16,6 +16,18 @@ local function applyRandomCurse(player)
         end
     end
     -- Add the curse to the player's storage
-    player:setStorageValue(storedCurse, 1)
-	player:getPosition():sendMagicEffect(CONST_ME_POFF)
+    self:setStorageValue(storedCurse, 1)
+	self:getPosition():sendMagicEffect(CONST_ME_POFF)
 end
+
+function Player.resetCurses(self)
+    local curses = SoulWar.Curses
+    for _, curseId in pairs(curses) do
+        self:setStorageValue(curseId, -1)
+    end
+end
+
+function Player.hasKilledMegalomania(self)
+    resetCurses(self)
+end
+
