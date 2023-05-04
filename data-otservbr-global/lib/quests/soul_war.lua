@@ -27,6 +27,16 @@ function Player.resetCurses(self)
     end
 end
 
+function Player.getCurses(self)
+    local curseList = {}
+    for curseName, curseId in pairs(SoulWarLib.Curses) do
+        if self:getStorageValue(curseId) == 1 then
+            table.insert(curseList, curseName)
+        end
+    end
+    return curseList
+end
+
 function Player.hasKilledMegalomania(self)
     resetCurses()
 end
