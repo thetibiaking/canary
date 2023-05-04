@@ -20,6 +20,32 @@ function Player.applyRandomCurse(self)
 	self:getPosition():sendMagicEffect(CONST_ME_POFF)
 end
 
+function Player.removeRandomCurses(self, bossName)
+    -- Verify if the boss that was killed matches the expected boss name
+    if bossName ~= "Megalomania" then
+        return -- do nothing if the boss name doesn't match
+    end
+
+    -- Get a list of curses the player currently has
+    local cursesList = self:getCurses()
+
+    -- If the player has less than 2 curses, just remove all curses instead
+    if #cursesList < 2 then
+        self:resetCurses()
+        return
+    end
+
+    -- Shuffle the curses list
+    for i = #cursesList, 2, -1 do
+        local j = math.random(i)
+        cursesList[i], cursesList[j] = cursesList[j], cursesList[i]
+    end
+
+    -- Remove the first two curses in the shuffled list
+    self:removeCurse(SoulWar.Curses[cursesList[1]])
+    self:removeCurse(SoulWar.Curses[cursesList[2]])
+end
+
 function Player.removeCurses(self)
     local curses = SoulWar.Curses
     for curseName, curseId in pairs(curses) do
@@ -57,7 +83,8 @@ function Player.hasAllCurses(self)
     return true
 end
 
-function Player.hasKilledMegalomania(self)
-    resetCurses()
+function Player:hasKilledMegalomania(self)
+    self:resetCurses()
+    self:removeRandomCurses()
 end
 
