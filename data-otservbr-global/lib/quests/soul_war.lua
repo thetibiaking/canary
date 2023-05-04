@@ -20,6 +20,17 @@ function Player.applyRandomCurse(self)
 	self:getPosition():sendMagicEffect(CONST_ME_POFF)
 end
 
+function Player.removeCurses(self)
+    local curses = SoulWar.Curses
+    for curseName, curseId in pairs(curses) do
+        if curseId == curses.EbbandFlow or curseId == curses.RottenWasteland then
+            self:setStorageValue(curseId, -1)
+            self:getPosition():sendMagicEffect(CONST_ME_POFF)
+        end
+    end
+end
+
+
 function Player.resetCurses(self)
     local curses = SoulWar.Curses
     for _, curseId in pairs(curses) do
