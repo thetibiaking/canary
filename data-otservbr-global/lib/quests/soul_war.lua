@@ -30,7 +30,6 @@ function Player.removeCurses(self)
     end
 end
 
-
 function Player.resetCurses(self)
     local curses = SoulWar.Curses
     for _, curseId in pairs(curses) do
@@ -46,6 +45,16 @@ function Player.getCurses(self)
         end
     end
     return curseList
+end
+
+function Player.hasAllCurses(self)
+    local curses = SoulWar.Curses
+    for _, curseId in pairs(curses) do
+        if self:getStorageValue(curseId) ~= 1 then
+            return false
+        end
+    end
+    return true
 end
 
 function Player.hasKilledMegalomania(self)
