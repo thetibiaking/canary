@@ -3019,7 +3019,12 @@ GlobalStorage = {
 	NightmareIsle = 65015,
 	IceCrack = 65016,
 	UglyMonster = 65017,
+	PrimalOrdealQuest = {
+		Gnomcruiter = 65018,
+		GnompronaAcess = 65019,
+	}
 	KeysUpdate = 40000, -- Reserved storage from 40000 - 40000
+
 }
 
 startupGlobalStorages = {
